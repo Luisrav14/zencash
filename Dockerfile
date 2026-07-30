@@ -8,10 +8,10 @@ RUN corepack enable
 FROM base AS deps
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY prisma ./prisma
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --config.confirmModulesPurge=false
 
 # ---------- build ----------
 FROM base AS builder
@@ -37,4 +37,3 @@ EXPOSE 3000
 
 # Aplica migraciones pendientes y arranca el servidor Next.js.
 CMD ["sh", "-c", "pnpm prisma:migrate:deploy && pnpm start"]
-
