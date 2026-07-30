@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+
+  categories       Category[]
+  accounts         Account[]
+  transactions     Transaction[]
+  budgets          Budget[]
+  upcomingPayments UpcomingPayment[]
+}
+
+model Category {
+  id       String  @id @default(cuid())
+  name     String
+  icon     String?
+  color    String?
+  type     String // "income" | "expense"
+  parentId String?
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children Category[] @relation("CategoryTree")
+  userId   String
+  user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  transactions Transaction[]
+  budgets      Budget[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([parentId])
+}
+
+model Account {
+  id             String  @id @default(cuid())
+  name           String
+  type           String // "cash" | "card" | "bank"
+  initialBalance Float   @default(0)
+  color          String?
+  userId         String
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  transactions Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Transaction {
+  id         String   @id @default(cuid())
+  amount     Float
+  type       String // "income" | "expense"
+  date       DateTime
+  note       String?
+  tags       String? // CSV simple
+  categoryId String
+  accountId  String
+  userId     String
+  category   Category @relation(fields: [categoryId], references: [id])
+  account    Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([categoryId])
+  @@index([accountId])
+  @@index([date])
+}
+
+model Budget {
+  id         String   @id @default(cuid())
+  categoryId String
+  amount     Float
+  period     String // "monthly"
+  userId     String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, categoryId, period])
+}
+
+model UpcomingPayment {
+  id         String    @id @default(cuid())
+  amount     Float
+  dueDate    DateTime
+  note       String?
+  categoryId String?
+  paid       Boolean   @default(false)
+  paidAt     DateTime?
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([dueDate])
+}
