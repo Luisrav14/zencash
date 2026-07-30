@@ -36,4 +36,4 @@ COPY --from=builder /app/prisma ./prisma
 EXPOSE 3000
 
 # Aplica migraciones pendientes y arranca el servidor Next.js.
-CMD ["sh", "-c", "pnpm prisma:migrate:deploy && pnpm start"]
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && exec node_modules/.bin/next start"]
