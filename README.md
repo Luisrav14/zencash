@@ -99,6 +99,3 @@ public/                       manifest.json, sw.js, icon.svg (assets de la PWA)
 | `pnpm prisma:migrate`  | Crea/aplica migraciones (dev)            |
 | `pnpm prisma:studio`   | Abre Prisma Studio para ver/editar datos |
 
-## Estado del proyecto
-
-Este es el andamiaje base: autenticación funcional, modelo de datos completo y CRUD por capas para categorías, cuentas, movimientos, presupuestos y próximos pagos vía API. Las pantallas de `(app)` (movimientos, sobres, próximos pagos, ajustes) son placeholders listos para conectarse a los endpoints y a Dexie/TanStack Query.
