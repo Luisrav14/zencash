@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+.env
+.env.*
+!.env.example
+.pnpm-store
+prisma/*.db
+prisma/*.db-journal
+*.log
+.DS_Store

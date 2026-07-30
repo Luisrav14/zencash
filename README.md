@@ -89,13 +89,42 @@ public/                       manifest.json, sw.js, icon.svg (assets de la PWA)
 
 ### Scripts disponibles
 
-| Comando                | Descripción                              |
-| ---------------------- | ---------------------------------------- |
-| `pnpm dev`             | Servidor de desarrollo (Turbopack)       |
-| `pnpm build`           | Build de producción                      |
-| `pnpm start`           | Sirve el build de producción             |
-| `pnpm lint`            | Linter (ESLint)                          |
-| `pnpm prisma:generate` | Regenera el cliente de Prisma            |
-| `pnpm prisma:migrate`  | Crea/aplica migraciones (dev)            |
-| `pnpm prisma:studio`   | Abre Prisma Studio para ver/editar datos |
+| Comando                      | Descripción                                         |
+| ---------------------------- | --------------------------------------------------- |
+| `pnpm dev`                   | Servidor de desarrollo (Turbopack)                  |
+| `pnpm build`                 | Build de producción                                 |
+| `pnpm start`                 | Sirve el build de producción                        |
+| `pnpm lint`                  | Linter (ESLint)                                     |
+| `pnpm prisma:generate`       | Regenera el cliente de Prisma                       |
+| `pnpm prisma:migrate`        | Crea/aplica migraciones (dev)                       |
+| `pnpm prisma:studio`         | Abre Prisma Studio para ver/editar datos            |
+| `pnpm prisma:migrate:deploy` | Aplica migraciones ya generadas (uso en producción) |
 
+## Deploy
+
+### Railway (recomendado, sin Docker)
+
+El repo incluye [`railway.json`](railway.json) usando el builder **Nixpacks**, que detecta `pnpm` automáticamente. Pasos:
+
+1. Crea el proyecto en Railway y conéctalo a este repositorio.
+2. Define las variables de entorno en el servicio: `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` y `DATABASE_URL`.
+3. Como SQLite es un archivo local, el filesystem de Railway **no persiste** entre deploys a menos que agregues un [Volume](https://docs.railway.com/reference/volumes). Crea un volumen (por ejemplo montado en `/data`) y usa `DATABASE_URL=file:/data/prod.db`.
+4. Railway ejecuta `pnpm install` (dispara `postinstall` → `prisma generate`) y `pnpm build`. Al arrancar corre el `startCommand` definido en `railway.json`: `pnpm prisma:migrate:deploy && pnpm start`, que aplica migraciones pendientes antes de levantar el servidor.
+
+> Si ves el error `packages field missing or empty` al desplegar: pnpm exige que `pnpm-workspace.yaml` tenga la clave `packages` (aunque el repo no sea un monorepo). Ya está corregido con `packages: ["."]` en [`pnpm-workspace.yaml`](pnpm-workspace.yaml), además de declarar `pnpm.onlyBuiltDependencies` en `package.json` para que los `postinstall` de Prisma/sharp corran sin pedir aprobación interactiva en CI.
+
+### Contenerización (Docker)
+
+También puedes desplegar con el [`Dockerfile`](Dockerfile) incluido (build multi-stage: deps → build → runtime, basado en `node:20-alpine`):
+
+```bash
+docker build -t zencash .
+docker run -p 3000:3000 \
+  -e DATABASE_URL="file:/app/prisma/dev.db" \
+  -e JWT_ACCESS_SECRET="cambia-esto" \
+  -e JWT_REFRESH_SECRET="cambia-esto" \
+  -v zencash-data:/app/prisma \
+  zencash
+```
+
+El `CMD` del contenedor corre `prisma migrate deploy` antes de `next start`. Monta un volumen en `/app/prisma` (o la ruta que uses en `DATABASE_URL`) para que la base SQLite persista entre reinicios del contenedor. En Railway, si eliges el builder **Dockerfile** en vez de Nixpacks, se usa este mismo archivo automáticamente.
