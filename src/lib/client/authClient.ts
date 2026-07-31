@@ -1,6 +1,7 @@
 export type AuthUser = {
   id: string;
   email: string;
+  name?: string;
 };
 
 async function parseJson(res: Response) {

@@ -60,6 +60,19 @@ export const authController = {
     }
   },
 
+  async me(req: NextRequest) {
+    const accessToken = req.cookies.get(ACCESS_COOKIE)?.value;
+    if (!accessToken) {
+      return NextResponse.json({ error: "No hay sesión activa" }, { status: 401 });
+    }
+    try {
+      const user = await authService.getUserFromAccessToken(accessToken);
+      return NextResponse.json({ user });
+    } catch {
+      return NextResponse.json({ error: "Sesión expirada" }, { status: 401 });
+    }
+  },
+
   async refresh(req: NextRequest) {
     const refreshToken = req.cookies.get(REFRESH_COOKIE)?.value;
     if (!refreshToken) {

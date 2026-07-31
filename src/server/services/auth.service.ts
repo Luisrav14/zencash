@@ -47,4 +47,12 @@ export const authService = {
     const refreshToken = await signRefreshToken({ sub: userId, email });
     return { accessToken, refreshToken, user: { id: userId, email } };
   },
+
+  async getUserFromAccessToken(accessToken: string) {
+    const { verifyAccessToken } = await import("@/lib/jwt");
+    const payload = await verifyAccessToken(accessToken);
+    const user = await userRepository.findById(payload.sub);
+    if (!user) throw new Error("Usuario no encontrado");
+    return { id: user.id, email: user.email, name: user.name };
+  },
 };

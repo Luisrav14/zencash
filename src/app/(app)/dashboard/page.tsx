@@ -7,12 +7,14 @@ import { useAccounts } from "@/hooks/useAccounts";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useBudgets } from "@/hooks/useBudgets";
 import { useUpcomingPayments } from "@/hooks/useUpcomingPayments";
+import { useSession } from "@/lib/client/useSession";
 
 export default function DashboardPage() {
   const { data: accounts } = useAccounts();
   const { data: transactions } = useTransactions();
   const { data: budgets } = useBudgets();
   const { data: upcomingPayments } = useUpcomingPayments();
+  const { user } = useSession();
 
   const initialBalance = (accounts ?? []).reduce((sum, a) => sum + a.initialBalance, 0);
   const income = (transactions ?? []).filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
@@ -22,17 +24,19 @@ export default function DashboardPage() {
   const pendingPayments = (upcomingPayments ?? []).filter((p) => !p.paid);
   const pendingTotal = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
 
+  const userName = user?.name ?? "";
+
   return (
     <>
-      <TopBar title="Hola 👋" subtitle="Este es tu resumen de hoy" />
+      <TopBar title={`Hola ${userName} ${" 👋 "}`} subtitle="Este es tu resumen de hoy" />
 
       <section className="space-y-4 px-5 pt-5">
         <Card className="bg-primary text-primary-foreground">
           <p className="text-sm opacity-80">Saldo total</p>
           <p className="mt-1 text-3xl font-semibold tracking-tight">{formatCurrency(balance)}</p>
           <div className="mt-4 flex gap-4 text-sm">
-            <span className="opacity-90">↑ Ingresos {formatCurrency(income)}</span>
-            <span className="opacity-90">↓ Gastos {formatCurrency(expense)}</span>
+            <span className="opacity-90 text-green-800">↑ Ingresos {formatCurrency(income)}</span>
+            <span className="opacity-90 text-red-600">↓ Gastos {formatCurrency(expense)}</span>
           </div>
         </Card>
 

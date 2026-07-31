@@ -1,6 +1,4 @@
 import { withAuth } from "@/server/middlewares/withAuth";
-import { NextResponse } from "next/server";
+import { authController as AuthController } from "@/server/controllers/auth.controller";
 
-export const GET = withAuth((_req, ctx) => {
-  return NextResponse.json({ user: { id: ctx.userId, email: ctx.email } });
-});
+export const GET = withAuth((req) => AuthController.me(req));
