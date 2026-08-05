@@ -52,7 +52,8 @@ model Account {
   userId         String
   user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  transactions Transaction[]
+  transactions     Transaction[]
+  upcomingPayments UpcomingPayment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -104,9 +105,11 @@ model UpcomingPayment {
   dueDate    DateTime
   note       String?
   categoryId String?
+  accountId  String?
   paid       Boolean   @default(false)
   paidAt     DateTime?
   userId     String
+  account    Account?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
@@ -114,4 +117,5 @@ model UpcomingPayment {
 
   @@index([userId])
   @@index([dueDate])
+  @@index([accountId])
 }

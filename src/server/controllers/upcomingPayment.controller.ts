@@ -8,6 +8,7 @@ const createSchema = z.object({
   dueDate: z.coerce.date(),
   note: z.string().optional(),
   categoryId: z.string().optional(),
+  accountId: z.string().optional(),
 });
 
 const updateSchema = createSchema.partial().extend({ paid: z.boolean().optional() });

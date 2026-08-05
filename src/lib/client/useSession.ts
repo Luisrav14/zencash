@@ -1,32 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { meRequest, type AuthUser } from "@/lib/client/authClient";
+import { useQuery } from "@tanstack/react-query";
+import { meRequest } from "@/lib/client/authClient";
 
 export function useSession() {
   const router = useRouter();
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [status, setStatus] = useState<"loading" | "authenticated" | "unauthenticated">("loading");
+  // Cacheada bajo una sola queryKey: evita refetch de /api/auth/me en cada pantalla/hook que la use.
+  const { data, isLoading } = useQuery({
+    queryKey: ["session"],
+    queryFn: meRequest,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
 
   useEffect(() => {
-    let active = true;
+    if (!isLoading && data === null) {
+      router.replace("/login");
+    }
+  }, [isLoading, data, router]);
 
-    meRequest().then((sessionUser) => {
-      if (!active) return;
-      if (sessionUser) {
-        setUser(sessionUser);
-        setStatus("authenticated");
-      } else {
-        setStatus("unauthenticated");
-        router.replace("/login");
-      }
-    });
+  const status: "loading" | "authenticated" | "unauthenticated" = isLoading ? "loading" : data ? "authenticated" : "unauthenticated";
 
-    return () => {
-      active = false;
-    };
-  }, [router]);
-
-  return { user, status };
+  return { user: data ?? null, status };
 }

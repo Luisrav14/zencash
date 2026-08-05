@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -9,6 +10,7 @@ import { registerRequest } from "@/lib/client/authClient";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -24,6 +26,7 @@ export default function RegisterPage() {
         email: String(form.get("email") ?? ""),
         password: String(form.get("password") ?? ""),
       });
+      await queryClient.invalidateQueries({ queryKey: ["session"] });
       router.push("/dashboard");
       router.refresh();
     } catch (err) {

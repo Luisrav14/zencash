@@ -10,6 +10,7 @@ import { formatCurrency, cn } from "@/lib/utils";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useCategories } from "@/hooks/useCategories";
 import { useCreateTransaction, useDeleteTransaction, useTransactions } from "@/hooks/useTransactions";
+import { AddToggleButton } from "@/components/ui/AddToggleButton";
 
 export default function TransactionsPage() {
   const { data: transactions, isLoading } = useTransactions();
@@ -20,6 +21,7 @@ export default function TransactionsPage() {
 
   const [type, setType] = useState<"income" | "expense">("expense");
   const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
 
   const filteredCategories = (categories ?? []).filter((c) => c.type === type);
 
@@ -38,6 +40,7 @@ export default function TransactionsPage() {
         note: String(form.get("note") ?? "") || undefined,
       });
       (event.target as HTMLFormElement).reset();
+      setShowForm(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo registrar el movimiento");
     }
@@ -51,61 +54,66 @@ export default function TransactionsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Nuevo movimiento</CardTitle>
+            <AddToggleButton open={showForm} onClick={() => setShowForm((v) => !v)} label="Agregar movimiento" />
           </CardHeader>
 
-          <div className="mb-4 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setType("expense")}
-              className={cn(
-                "h-10 rounded-xl text-sm font-medium transition-colors",
-                type === "expense" ? "bg-expense/15 text-expense" : "bg-surface-muted text-muted-foreground",
-              )}
-            >
-              Gasto
-            </button>
-            <button
-              type="button"
-              onClick={() => setType("income")}
-              className={cn(
-                "h-10 rounded-xl text-sm font-medium transition-colors",
-                type === "income" ? "bg-income/15 text-income" : "bg-surface-muted text-muted-foreground",
-              )}
-            >
-              Ingreso
-            </button>
-          </div>
+          {showForm && (
+            <>
+              <div className="mb-4 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setType("expense")}
+                  className={cn(
+                    "h-10 rounded-xl text-sm font-medium transition-colors",
+                    type === "expense" ? "bg-expense/15 text-expense" : "bg-surface-muted text-muted-foreground",
+                  )}
+                >
+                  Gasto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setType("income")}
+                  className={cn(
+                    "h-10 rounded-xl text-sm font-medium transition-colors",
+                    type === "income" ? "bg-income/15 text-income" : "bg-surface-muted text-muted-foreground",
+                  )}
+                >
+                  Ingreso
+                </button>
+              </div>
 
-          <form className="space-y-3" onSubmit={handleSubmit}>
-            <Input label="Monto" name="amount" type="number" step="0.01" min="0" required />
-            <Select label="Cuenta" name="accountId" required defaultValue="">
-              <option value="" disabled>
-                Selecciona una cuenta
-              </option>
-              {accounts?.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name}
-                </option>
-              ))}
-            </Select>
-            <Select label="Categoría" name="categoryId" required defaultValue="">
-              <option value="" disabled>
-                Selecciona una categoría
-              </option>
-              {filteredCategories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.icon ? `${category.icon} ` : ""}
-                  {category.name}
-                </option>
-              ))}
-            </Select>
-            <Input label="Fecha" name="date" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required />
-            <Input label="Nota (opcional)" name="note" type="text" placeholder="Ej. Súper del mes" />
-            {error && <p className="text-sm text-expense">{error}</p>}
-            <Button type="submit" className="w-full" disabled={createTransaction.isPending}>
-              {createTransaction.isPending ? "Guardando…" : "Agregar movimiento"}
-            </Button>
-          </form>
+              <form className="space-y-3" onSubmit={handleSubmit}>
+                <Input label="Monto" name="amount" type="number" step="0.01" min="0" required />
+                <Select label="Cuenta" name="accountId" required defaultValue="">
+                  <option value="" disabled>
+                    Selecciona una cuenta
+                  </option>
+                  {accounts?.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name}
+                    </option>
+                  ))}
+                </Select>
+                <Select label="Categoría" name="categoryId" required defaultValue="">
+                  <option value="" disabled>
+                    Selecciona una categoría
+                  </option>
+                  {filteredCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.icon ? `${category.icon} ` : ""}
+                      {category.name}
+                    </option>
+                  ))}
+                </Select>
+                <Input label="Fecha" name="date" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required />
+                <Input label="Nota (opcional)" name="note" type="text" placeholder="Ej. Súper del mes" />
+                {error && <p className="text-sm text-expense">{error}</p>}
+                <Button type="submit" className="w-full" disabled={createTransaction.isPending}>
+                  {createTransaction.isPending ? "Guardando…" : "Agregar movimiento"}
+                </Button>
+              </form>
+            </>
+          )}
         </Card>
 
         <div className="space-y-2">

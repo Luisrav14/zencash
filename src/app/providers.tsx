@@ -10,7 +10,11 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     registerSyncListeners();
-    void flushPendingMutations();
+    const sync = () => {
+      void flushPendingMutations().then(() => queryClient.invalidateQueries());
+    };
+    window.addEventListener("zencash:sync", sync);
+    sync();
 
     // El Service Worker solo se registra en producción: en dev (Turbopack/HMR)
     // el cache-first del SW puede servir bundles viejos y causar loops de carga.
@@ -23,6 +27,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         registrations.forEach((registration) => registration.unregister());
       });
     }
+    return () => window.removeEventListener("zencash:sync", sync);
   }, []);
 
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;

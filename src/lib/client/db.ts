@@ -46,6 +46,7 @@ export type LocalUpcomingPayment = {
   dueDate: string;
   note?: string;
   categoryId?: string;
+  accountId?: string;
   paid: boolean;
   userId: string;
 };
@@ -56,6 +57,7 @@ export type PendingMutation = {
   operation: "create" | "update" | "delete";
   payload: unknown;
   entityId?: string;
+  localId?: string;
   createdAt: string;
 };
 

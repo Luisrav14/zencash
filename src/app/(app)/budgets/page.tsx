@@ -10,6 +10,7 @@ import { formatCurrency } from "@/lib/utils";
 import { useCategories } from "@/hooks/useCategories";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useBudgets, useCreateBudget, useDeleteBudget } from "@/hooks/useBudgets";
+import { AddToggleButton } from "@/components/ui/AddToggleButton";
 
 export default function BudgetsPage() {
   const { data: budgets, isLoading } = useBudgets();
@@ -19,6 +20,7 @@ export default function BudgetsPage() {
   const deleteBudget = useDeleteBudget();
 
   const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
   const expenseCategories = (categories ?? []).filter((c) => c.type === "expense");
 
   const now = new Date();
@@ -43,6 +45,7 @@ export default function BudgetsPage() {
         period: "monthly",
       });
       (event.target as HTMLFormElement).reset();
+      setShowForm(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear el sobre");
     }
@@ -56,25 +59,28 @@ export default function BudgetsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Nuevo sobre</CardTitle>
+            <AddToggleButton open={showForm} onClick={() => setShowForm((v) => !v)} label="Agregar sobre" />
           </CardHeader>
-          <form className="space-y-3" onSubmit={handleSubmit}>
-            <Select label="Categoría" name="categoryId" required defaultValue="">
-              <option value="" disabled>
-                Selecciona una categoría
-              </option>
-              {expenseCategories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.icon ? `${category.icon} ` : ""}
-                  {category.name}
+          {showForm && (
+            <form className="space-y-3" onSubmit={handleSubmit}>
+              <Select label="Categoría" name="categoryId" required defaultValue="">
+                <option value="" disabled>
+                  Selecciona una categoría
                 </option>
-              ))}
-            </Select>
-            <Input label="Monto mensual" name="amount" type="number" step="0.01" min="0" required />
-            {error && <p className="text-sm text-expense">{error}</p>}
-            <Button type="submit" className="w-full" disabled={createBudget.isPending}>
-              {createBudget.isPending ? "Guardando…" : "Crear sobre"}
-            </Button>
-          </form>
+                {expenseCategories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.icon ? `${category.icon} ` : ""}
+                    {category.name}
+                  </option>
+                ))}
+              </Select>
+              <Input label="Monto mensual" name="amount" type="number" step="0.01" min="0" required />
+              {error && <p className="text-sm text-expense">{error}</p>}
+              <Button type="submit" className="w-full" disabled={createBudget.isPending}>
+                {createBudget.isPending ? "Guardando…" : "Crear sobre"}
+              </Button>
+            </form>
+          )}
         </Card>
 
         <div className="space-y-2">

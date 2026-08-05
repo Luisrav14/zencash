@@ -43,15 +43,83 @@ export type UpcomingPayment = {
   dueDate: string;
   note?: string | null;
   categoryId?: string | null;
+  accountId?: string | null;
   paid: boolean;
+  paidAt?: string | null;
 };
 
+import { db, type PendingMutation } from "./db";
+import { queueMutation } from "./syncManager";
+
+class NetworkError extends Error {}
+
+const localId = () => `offline-${crypto.randomUUID()}`;
+
+async function cachedList<T extends { id: string }>(
+  userId: string,
+  online: () => Promise<T[]>,
+  table: { where: (key: string) => { equals: (value: string) => { toArray: () => Promise<T[]> } } },
+) {
+  try {
+    const result = await online();
+    await db.table(tableName(table)).bulkPut(result.map((item) => ({ ...item, userId })) as never[]);
+    return result;
+  } catch (error) {
+    if (!(error instanceof NetworkError)) throw error;
+    return table.where("userId").equals(userId).toArray();
+  }
+}
+
+function tableName(table: object) {
+  if (table === db.categories) return "categories";
+  if (table === db.accounts) return "accounts";
+  if (table === db.transactions) return "transactions";
+  if (table === db.budgets) return "budgets";
+  return "upcomingPayments";
+}
+
+async function offlineMutation<T extends { id: string }>(
+  entity: PendingMutation["entity"],
+  operation: "create" | "update" | "delete",
+  userId: string,
+  payload: Partial<T>,
+  table: { put: (...args: never[]) => Promise<unknown>; delete: (id: string) => Promise<unknown> },
+  request: () => Promise<T | { ok: true }>,
+): Promise<T | { ok: true }> {
+  try {
+    const result = await request();
+    if (operation !== "delete") await table.put({ ...result, userId } as never);
+    return result;
+  } catch (error) {
+    if (!(error instanceof NetworkError)) throw error;
+    const id = (payload.id as string | undefined) ?? localId();
+    if (operation === "delete") {
+      await table.delete(id);
+    } else {
+      await table.put({ ...payload, id, userId } as never);
+    }
+    await queueMutation({
+      entity,
+      operation,
+      payload: { ...payload, id: operation === "create" ? undefined : id },
+      entityId: operation === "create" ? undefined : id,
+      localId: operation === "create" ? id : undefined,
+    });
+    return operation === "delete" ? { ok: true } : ({ ...payload, id } as T);
+  }
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    ...init,
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      ...init,
+    });
+  } catch (error) {
+    throw new NetworkError(error instanceof Error ? error.message : "Sin conexión");
+  }
   const body = await res.json().catch(() => null);
   if (!res.ok) {
     const message = typeof body?.error === "string" ? body.error : "Ocurrió un error, intenta de nuevo";
@@ -61,56 +129,61 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export const categoriesApi = {
-  list: () => request<{ categories: Category[] }>("/api/categories").then((r) => r.categories),
-  create: (data: Partial<Category>) =>
-    request<{ category: Category }>("/api/categories", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }).then((r) => r.category),
-  remove: (id: string) => request<{ ok: true }>(`/api/categories/${id}`, { method: "DELETE" }),
+  list: (userId: string) => cachedList(userId, () => request<{ categories: Category[] }>("/api/categories").then((r) => r.categories), db.categories),
+  create: (userId: string, data: Partial<Category>) =>
+    offlineMutation("category", "create", userId, data, db.categories, () =>
+      request<{ category: Category }>("/api/categories", { method: "POST", body: JSON.stringify(data) }).then((r) => r.category),
+    ) as Promise<Category>,
+  remove: (userId: string, id: string) =>
+    offlineMutation("category", "delete", userId, { id }, db.categories, () => request<{ ok: true }>(`/api/categories/${id}`, { method: "DELETE" })),
 };
 
 export const accountsApi = {
-  list: () => request<{ accounts: Account[] }>("/api/accounts").then((r) => r.accounts),
-  create: (data: Partial<Account>) =>
-    request<{ account: Account }>("/api/accounts", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }).then((r) => r.account),
-  remove: (id: string) => request<{ ok: true }>(`/api/accounts/${id}`, { method: "DELETE" }),
+  list: (userId: string) => cachedList(userId, () => request<{ accounts: Account[] }>("/api/accounts").then((r) => r.accounts), db.accounts),
+  create: (userId: string, data: Partial<Account>) =>
+    offlineMutation("account", "create", userId, data, db.accounts, () =>
+      request<{ account: Account }>("/api/accounts", { method: "POST", body: JSON.stringify(data) }).then((r) => r.account),
+    ) as Promise<Account>,
+  remove: (userId: string, id: string) =>
+    offlineMutation("account", "delete", userId, { id }, db.accounts, () => request<{ ok: true }>(`/api/accounts/${id}`, { method: "DELETE" })),
 };
 
 export const transactionsApi = {
-  list: () => request<{ transactions: Transaction[] }>("/api/transactions").then((r) => r.transactions),
-  create: (data: Partial<Transaction>) =>
-    request<{ transaction: Transaction }>("/api/transactions", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }).then((r) => r.transaction),
-  remove: (id: string) => request<{ ok: true }>(`/api/transactions/${id}`, { method: "DELETE" }),
+  list: (userId: string) =>
+    cachedList(userId, () => request<{ transactions: Transaction[] }>("/api/transactions").then((r) => r.transactions), db.transactions),
+  create: (userId: string, data: Partial<Transaction>) =>
+    offlineMutation("transaction", "create", userId, data, db.transactions, () =>
+      request<{ transaction: Transaction }>("/api/transactions", { method: "POST", body: JSON.stringify(data) }).then((r) => r.transaction),
+    ) as Promise<Transaction>,
+  remove: (userId: string, id: string) =>
+    offlineMutation("transaction", "delete", userId, { id }, db.transactions, () =>
+      request<{ ok: true }>(`/api/transactions/${id}`, { method: "DELETE" }),
+    ),
 };
 
 export const budgetsApi = {
-  list: () => request<{ budgets: Budget[] }>("/api/budgets").then((r) => r.budgets),
-  create: (data: Partial<Budget>) =>
-    request<{ budget: Budget }>("/api/budgets", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }).then((r) => r.budget),
-  remove: (id: string) => request<{ ok: true }>(`/api/budgets/${id}`, { method: "DELETE" }),
+  list: (userId: string) => cachedList(userId, () => request<{ budgets: Budget[] }>("/api/budgets").then((r) => r.budgets), db.budgets),
+  create: (userId: string, data: Partial<Budget>) =>
+    offlineMutation("budget", "create", userId, data, db.budgets, () =>
+      request<{ budget: Budget }>("/api/budgets", { method: "POST", body: JSON.stringify(data) }).then((r) => r.budget),
+    ) as Promise<Budget>,
+  remove: (userId: string, id: string) =>
+    offlineMutation("budget", "delete", userId, { id }, db.budgets, () => request<{ ok: true }>(`/api/budgets/${id}`, { method: "DELETE" })),
 };
 
 export const upcomingPaymentsApi = {
-  list: () => request<{ payments: UpcomingPayment[] }>("/api/upcoming-payments").then((r) => r.payments),
-  create: (data: Partial<UpcomingPayment>) =>
-    request<{ payment: UpcomingPayment }>("/api/upcoming-payments", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }).then((r) => r.payment),
-  update: (id: string, data: Partial<UpcomingPayment>) =>
-    request<{ payment: UpcomingPayment }>(`/api/upcoming-payments/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }).then((r) => r.payment),
-  remove: (id: string) => request<{ ok: true }>(`/api/upcoming-payments/${id}`, { method: "DELETE" }),
+  list: (userId: string) =>
+    cachedList(userId, () => request<{ payments: UpcomingPayment[] }>("/api/upcoming-payments").then((r) => r.payments), db.upcomingPayments),
+  create: (userId: string, data: Partial<UpcomingPayment>) =>
+    offlineMutation("upcomingPayment", "create", userId, data, db.upcomingPayments, () =>
+      request<{ payment: UpcomingPayment }>("/api/upcoming-payments", { method: "POST", body: JSON.stringify(data) }).then((r) => r.payment),
+    ) as Promise<UpcomingPayment>,
+  update: (userId: string, id: string, data: Partial<UpcomingPayment>) =>
+    offlineMutation("upcomingPayment", "update", userId, { ...data, id }, db.upcomingPayments, () =>
+      request<{ payment: UpcomingPayment }>(`/api/upcoming-payments/${id}`, { method: "PUT", body: JSON.stringify(data) }).then((r) => r.payment),
+    ) as Promise<UpcomingPayment>,
+  remove: (userId: string, id: string) =>
+    offlineMutation("upcomingPayment", "delete", userId, { id }, db.upcomingPayments, () =>
+      request<{ ok: true }>(`/api/upcoming-payments/${id}`, { method: "DELETE" }),
+    ),
 };
